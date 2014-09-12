@@ -45,7 +45,7 @@ module.exports = function (grunt) {
       includedemo: false,
       symbol: {},
       cleanupdefs: false,
-      fixedSizeVersion: false
+      fixedSizeVersions: []
     });
 
     var cleanupAttributes = [];
@@ -233,52 +233,85 @@ module.exports = function (grunt) {
           });
         }
 
-        if (viewBox && !!options.fixedSizeVersion) {
-          var fixedWidth = options.fixedSizeVersion.width || 50;
-          var fixedHeight = options.fixedSizeVersion.width || 50;
-          var $resFixed = cheerio.load('<symbol><use></use></symbol>', { lowerCaseAttributeNames: false });
-          var fixedId = graphicId + (options.fixedSizeVersion.suffix || '-fixed-size');
-          var $symbolFixed = $resFixed('symbol')
-            .first()
-            .attr('viewBox', [0, 0, fixedWidth, fixedHeight].join(' '))
-            .attr('id', fixedId);
-          Object.keys(options.symbol).forEach(function (key) {
-            $symbolFixed.attr(key, options.symbol[key]);
+        if (viewBox && options.fixedSizeVersions.length) {
+          options.fixedSizeVersions.forEach(function (version) {
+
+            var fixedWidth = version.width || 50;
+            var fixedHeight = version.width || 50;
+            var $resFixed = cheerio.load('<symbol><use></use></symbol>', { lowerCaseAttributeNames: false });
+            var fixedId = graphicId +
+              (version.suffix || '-' + [(version.align || 'center'), (version.verticalAlign || 'middle')].join('-'));
+            var $symbolFixed = $resFixed('symbol')
+              .first()
+              .attr('viewBox', [0, 0, fixedWidth, fixedHeight].join(' '))
+              .attr('id', fixedId);
+            Object.keys(options.symbol).forEach(function (key) {
+              $symbolFixed.attr(key, options.symbol[key]);
+            });
+            if (desc) {
+              $symbolFixed.prepend('<desc>' + desc + '</desc>');
+            }
+            if (title) {
+              $symbolFixed.prepend('<title>' + title + '</title>');
+            }
+            var originalViewBox = viewBox
+              .split(' ')
+              .map(function (string) {
+                return parseInt(string);
+              });
+
+            var translate = {
+              x: 0,
+              y: 0,
+            };
+            if (version.align !== 'left') {
+              if (version.align === 'right') {
+                translate.x = fixedWidth - originalViewBox[2] + originalViewBox[0]
+              } else {
+                translate.x = ((fixedHeight - originalViewBox[2]) / 2) + originalViewBox[0]
+              }
+            }
+            if (version.verticalAlign !== 'middle') {
+              translate.y = 0.5 * (fixedHeight - originalViewBox[3]);
+              if (version.verticalAlign === 'top') {
+                translate.y = -translate.y;
+              }
+            }
+            var scale = Math.max.apply(null, [originalViewBox[2], originalViewBox[3]]) /
+              Math.max.apply(null, [fixedWidth, fixedHeight]);
+
+            var transformations = [];
+
+            function getPrecisionOptimised(value, precision) {
+                return parseFloat(value.toFixed(precision)).toPrecision();
+            }
+
+            if (scale !== 1) {
+              transformations.push('scale(' + getPrecisionOptimised(scale, version.maxDigits.scale || 4) + ')');
+            }
+            if (translate.x !== 0 || translate.y !== 0) {
+              transformations.push(
+                'translate(' + [
+                    getPrecisionOptimised(translate.x, version.maxDigits.translation || 4),
+                    getPrecisionOptimised(translate.y, version.maxDigits.translation || 4)
+                    ].join(', ') +
+                ')');
+            }
+
+            var use = $symbolFixed
+              .find('use')
+              .attr('xlink:href', '#' + graphicId);
+            if (transformations.length) {
+              use.attr('transform', transformations.join(' '));
+            }
+
+            $resultSvg.append($resFixed.html());
+            if (options.includedemo) {
+              iconNameViewBoxArray.push({
+                name: fixedId
+              });
+            }
           });
-          if (desc) {
-            $symbolFixed.prepend('<desc>' + desc + '</desc>');
-          }
-          if (title) {
-            $symbolFixed.prepend('<title>' + title + '</title>');
-          }
-          var originalViewBox = viewBox
-            .split(' ')
-            .map(function (string) {
-              return parseInt(string);
-            });
-
-          var translationX = ((fixedWidth - originalViewBox[2]) / 2) + originalViewBox[0];
-          var translationY = ((fixedHeight - originalViewBox[3]) / 2) + originalViewBox[1];
-          var scale = Math.max.apply(null, [originalViewBox[2], originalViewBox[3]]) /
-            Math.max.apply(null, [fixedWidth, fixedHeight]);
-
-          $symbolFixed
-            .find('use')
-            .attr('xlink:href', '#' + fixedId)
-            .attr('transform', [
-              'scale(' + parseFloat(scale.toFixed(options.fixedSizeVersion.maxDigits.scale || 4)).toPrecision() + ')',
-              'translate(' + [
-                parseFloat(translationX.toFixed(options.fixedSizeVersion.maxDigits.translation || 4)).toPrecision(),
-                parseFloat(translationY.toFixed(options.fixedSizeVersion.maxDigits.translation || 4)).toPrecision()
-              ].join(', ') + ')'
-            ].join(' '));
-
-          $resultSvg.append($resFixed.html());
-          if (options.includedemo) {
-            iconNameViewBoxArray.push({
-              name: fixedId
-            });
-          }
         }
       });
 
