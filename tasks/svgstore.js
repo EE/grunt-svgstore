@@ -71,7 +71,7 @@ module.exports = function (grunt) {
       inheritviewbox: false,
       cleanupdefs: false,
       convertNameToId: defaultConvertNameToId,
-      fixedSizeVersion: false
+      fixedSizeVersion: []
     });
 
     var cleanupAttributes = [];
@@ -291,52 +291,93 @@ module.exports = function (grunt) {
           });
         }
 
-        if (viewBox && !!options.fixedSizeVersion) {
-          var fixedWidth = options.fixedSizeVersion.width || 50;
-          var fixedHeight = options.fixedSizeVersion.width || 50;
-          var $resFixed = cheerio.load('<symbol><use></use></symbol>', { lowerCaseAttributeNames: false });
-          var fixedId = graphicId + (options.fixedSizeVersion.suffix || '-fixed-size');
-          var $symbolFixed = $resFixed('symbol')
-            .first()
-            .attr('viewBox', [0, 0, fixedWidth, fixedHeight].join(' '))
-            .attr('id', fixedId);
-          Object.keys(options.symbol).forEach(function (key) {
-            $symbolFixed.attr(key, options.symbol[key]);
+        if (viewBox && options.fixedSizeVersion) {
+          var versions = Array.isArray(options.fixedSizeVersion) ?
+              options.fixedSizeVersion :
+              [options.fixedSizeVersion];
+
+          versions.forEach(function (version) {
+            var fixedWidth = version.width || 50;
+            var fixedHeight = version.width || 50;
+            var align = version.align || 'center';
+            var vAlign = version.vAlign || 'middle';
+            var $resFixed = cheerio.load('<symbol><use></use></symbol>', { lowerCaseAttributeNames: false });
+
+            // suffix is used as set, composed from align and vAlign or if neither of them is set explicitely it's set
+            // to `-fixed-size` for backwards compatibility.
+            var fixedId = graphicId + (
+              version.suffix ||
+              ((version.align || version.vAlign) && ('-' + align + '-' + vAlign)) ||
+              '-fixed-size'
+            );
+            var $symbolFixed = $resFixed('symbol')
+              .first()
+              .attr('viewBox', [0, 0, fixedWidth, fixedHeight].join(' '))
+              .attr('id', fixedId);
+            Object.keys(options.symbol).forEach(function (key) {
+              $symbolFixed.attr(key, options.symbol[key]);
+            });
+            if (desc) {
+              $symbolFixed.prepend('<desc>' + desc + '</desc>');
+            }
+            if (title) {
+              $symbolFixed.prepend('<title>' + title + '</title>');
+            }
+            var originalViewBox = viewBox
+              .split(' ')
+              .map(function (string) {
+                return parseInt(string);
+              });
+
+            var translate = {
+              x: 0,
+              y: 0
+            };
+
+            if (align !== 'left') { // align: left -> do nothing
+              translate.x = originalViewBox[0] + ((fixedWidth - originalViewBox[2]) * (align === 'right' ? 1 : 0.5))
+            }
+            if (vAlign !== 'middle') {
+              translate.y = (fixedHeight - originalViewBox[3]) * (vAlign === 'top' ? -0.5 : 0.5);
+            }
+
+            function getPrecisionOptimised(value, precision) {
+                return parseFloat(value.toFixed(precision)).toPrecision();
+            }
+
+            var scale = Math.max(originalViewBox[2], originalViewBox[3]) / Math.max(fixedWidth, fixedHeight);
+            var transformations = [];
+            var maxDigits = {
+              scale: version.maxDigits && version.maxDigits.scale || 4,
+              translation: version.maxDigits && version.maxDigits.translation || 4
+            };
+
+            if (scale !== 1) {
+              transformations.push('scale(' + getPrecisionOptimised(scale, maxDigits.scale) + ')');
+            }
+            if (translate.x !== 0 || translate.y !== 0) {
+              transformations.push(
+                'translate(' + [
+                    getPrecisionOptimised(translate.x, maxDigits.translation),
+                    getPrecisionOptimised(translate.y, maxDigits.translation)
+                    ].join(', ') +
+                ')');
+            }
+
+            var use = $symbolFixed
+              .find('use')
+              .attr('xlink:href', '#' + graphicId);
+            if (transformations.length) {
+              use.attr('transform', transformations.join(' '));
+            }
+
+            $resultSvg.append($resFixed.html());
+            if (options.includedemo) {
+              iconNameViewBoxArray.push({
+                name: fixedId
+              });
+            }
           });
-          if (desc) {
-            $symbolFixed.prepend('<desc>' + desc + '</desc>');
-          }
-          if (title) {
-            $symbolFixed.prepend('<title>' + title + '</title>');
-          }
-          var originalViewBox = viewBox
-            .split(' ')
-            .map(function (string) {
-              return parseInt(string);
-            });
-
-          var translationX = ((fixedWidth - originalViewBox[2]) / 2) + originalViewBox[0];
-          var translationY = ((fixedHeight - originalViewBox[3]) / 2) + originalViewBox[1];
-          var scale = Math.max.apply(null, [originalViewBox[2], originalViewBox[3]]) /
-            Math.max.apply(null, [fixedWidth, fixedHeight]);
-
-          $symbolFixed
-            .find('use')
-            .attr('xlink:href', '#' + fixedId)
-            .attr('transform', [
-              'scale(' + parseFloat(scale.toFixed(options.fixedSizeVersion.maxDigits.scale || 4)).toPrecision() + ')',
-              'translate(' + [
-                parseFloat(translationX.toFixed(options.fixedSizeVersion.maxDigits.translation || 4)).toPrecision(),
-                parseFloat(translationY.toFixed(options.fixedSizeVersion.maxDigits.translation || 4)).toPrecision()
-              ].join(', ') + ')'
-            ].join(' '));
-
-          $resultSvg.append($resFixed.html());
-          if (options.includedemo) {
-            iconNameViewBoxArray.push({
-              name: fixedId
-            });
-          }
         }
       });
 

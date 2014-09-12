@@ -199,30 +199,36 @@ function(name) {
 Type: `Object` or `boolean`
 Default value: `false`
 
-When `true` or a configuration object is passed for each of the symbols another one, with suffixed id generated.
-All those additional symbols have the common dimensions and refers to the original symbols with `<use>`.
-Original symbols are placed exactly in the middle of the fixed-size viewBox of the fixed size version.
+Creates one (or more) additional versions of the symbol by adding symbols that internally reference previously created
+one but size of new symbols is fixed. All those additional symbols have the common dimensions and refer to the original
+symbol with `<use>` internally therefore no SVG code is duplicated. Their names are composed out of the original symbol
+name and a suffix (`suffix` setting). By default (when neither `align` nor `verticalAlign` settings are used) original
+symbol is placed exactly in the middle of the fixed-size version viewBox.
 
-Configuration reference and default values if `true` is passed:
+Configuration reference:
 ```js
 grunt.initConfig({
   svgstore: {
     options: {
-      fixedSizeVersion: {
-        width: 50,
-        height: 50,
-        suffix: '-fixed-size',
-        maxDigits: {
-          translation: 4,
-          scale: 4,
-        },
-      },
+      fixedSizeVersion: [
+        {
+          align: 'left',            // possible values: 'left', 'right', 'center'. Default: 'center'
+          vAlign: 'bottom',         // possible values: 'bottom', 'top', 'middle'. Default: 'middle'
+          width: 50,                // Default: 50,
+          height: 50,               // Default: 50
+          suffix: '-fixed-size',    // Defaults to '-${align}-${vAlign}' if either align or vAlign is set. `-fixed-size` otherwise
+          maxDigits: {
+            translation: 4,         // Default: 4
+            scale: 4,               // Default: 4
+          },
+        }
+      ],
     },
   },
 });
 ```
 
-Any of the configuration object properties may be omitted.
+if single fixed size version is created then object instead of an array can be passed.
 
 ### Usage Examples
 
