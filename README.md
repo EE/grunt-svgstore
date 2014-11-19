@@ -1,5 +1,7 @@
 # grunt-svgstore [![NPM version](https://badge.fury.io/js/grunt-svgstore.svg)](http://badge.fury.io/js/grunt-svgstore) [![Build Status](https://travis-ci.org/FWeinb/grunt-svgstore.svg?branch=master)](https://travis-ci.org/FWeinb/grunt-svgstore)
 
+THIS IS A FORK OF [grunt-svgstore](http://npmjs.com/package/grunt-svgstore). In most cases it's better to use the upstream package.
+
 > Merge SVGs from a folder.
 
 ## Why?
